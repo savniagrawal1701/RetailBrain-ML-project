@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RetailBrain: see late orders before they ship</title>
+  <meta name="description" content="RetailBrain is an end-to-end machine learning project: ten models that predict delivery times, late orders, review sentiment, repeat buyers, customer segments, recommendations, discounts and demand for an online store.">
+  <meta name="theme-color" content="#2D3CFF">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232D3CFF'/%3E%3Cpath d='M8 12h16v12H8zM8 12l3-4h10l3 4' fill='none' stroke='white' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <script>
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('rb-theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Unbounded:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body id="top">
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <a class="brand" href="#top" aria-label="RetailBrain home">
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" class="logo-bg"/><path d="M8 12h16v12H8zM8 12l3-4h10l3 4M16 12v5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" class="logo-fg"/></svg>
+    <span>RetailBrain</span>
+  </a>
+  <nav aria-label="Sections">
+    <a href="#oracle">Orders</a>
+    <a href="#reviews">Reviews</a>
+    <a href="#customers">Customers</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#demand">Demand</a>
+    <a href="#lab">Model lab</a>
+    <a href="#about">About</a>
+  </nav>
+  <button class="theme-btn" id="themeBtn" type="button" aria-label="Switch between light and dark theme" aria-pressed="false">
+    <svg class="i-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M18.7 5.3L17 7M7 17l-1.7 1.7"/></svg>
+    <svg class="i-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7z"/></svg>
+  </button>
+</header>
+
+<main id="main">
+
+  <!-- ===================== HERO = ORDER ORACLE ===================== -->
+  <section class="hero" id="oracle" aria-labelledby="h-oracle">
+    <div class="hero-copy">
+      <h1 id="h-oracle">Know which orders will go wrong before they ship.</h1>
+      <p class="lede">Fill in a parcel the way a shopper would. Two models read it: one estimates the delivery time, the other tells you how likely it is to arrive late.</p>
+      <div class="presets" role="group" aria-label="Example orders">
+        <button type="button" class="chip" data-preset="0">Holiday gift to Amazonas</button>
+        <button type="button" class="chip" data-preset="1">Everyday order, same state</button>
+        <button type="button" class="chip" data-preset="2">Heavy furniture, long haul</button>
+      </div>
+    </div>
+
+    <form class="label panel" id="orderForm" autocomplete="off">
+      <div class="label-head"><span>Shipping label</span><span class="muted">order #demo</span></div>
+      <div class="grid2">
+        <label class="field">Ships from
+          <select id="f-from"></select>
+        </label>
+        <label class="field">Delivers to
+          <select id="f-to"></select>
+        </label>
+      </div>
+      <label class="field">Category
+        <select id="f-cat"></select>
+      </label>
+      <div class="grid3">
+        <label class="field">Weight (kg)
+          <input id="f-weight" type="number" min="0.05" max="60" step="0.1" value="2">
+        </label>
+        <label class="field">Value (R$)
+          <input id="f-price" type="number" min="1" max="5000" step="1" value="90">
+        </label>
+        <label class="field">Items
+          <input id="f-items" type="number" min="1" max="10" step="1" value="1">
+        </label>
+      </div>
+      <div class="grid2">
+        <label class="field">Month ordered
+          <select id="f-month"></select>
+        </label>
+        <label class="field">Promised days
+          <input id="f-promised" type="number" min="1" max="90" step="1" placeholder="auto">
+        </label>
+      </div>
+      <button class="btn" type="submit" id="btnOrder">Check this order</button>
+      <p class="form-err" id="orderErr" role="alert" hidden></p>
+    </form>
+
+    <div class="verdict panel" id="verdict" aria-live="polite">
+      <svg class="route" id="route" viewBox="0 0 560 96" role="img" aria-label="Route from seller to buyer">
+        <path id="routePath" d="M44 62 C 150 8, 410 8, 516 62" class="route-line"/>
+        <circle cx="44" cy="62" r="9" class="route-dot"/><circle cx="516" cy="62" r="9" class="route-dot"/>
+        <text id="rFrom" x="44" y="90" text-anchor="middle" class="route-txt">SP</text>
+        <text id="rTo" x="516" y="90" text-anchor="middle" class="route-txt">AM</text>
+        <text id="rDist" x="280" y="14" text-anchor="middle" class="route-km">&nbsp;</text>
+        <g id="parcel" transform="translate(44 62)"><rect x="-9" y="-9" width="18" height="18" rx="4" class="parcel"/><path d="M-9 -2h18M0 -9v7" class="parcel-tape"/>
+        </g>
+      </svg>
+
+      <div class="stats">
+        <div class="stat"><span class="stat-k">Estimated delivery</span><span class="stat-v" id="vDays">–</span><span class="stat-s" id="vRange">&nbsp;</span></div>
+        <div class="stat"><span class="stat-k">Promised at checkout</span><span class="stat-v" id="vPromised">–</span><span class="stat-s" id="vGap">&nbsp;</span></div>
+        <div class="stat"><span class="stat-k">Chance of arriving late</span><span class="stat-v" id="vRisk">–</span><span class="stat-s" id="vBase">&nbsp;</span></div>
+      </div>
+
+      <div class="verdict-foot">
+        <div class="stamp" id="stamp" data-level="idle"><span id="stampTxt">Waiting</span></div>
+        <div class="why">
+          <div><h3>What pushes the risk up</h3><ul id="whyUp" class="why-list"></ul></div>
+          <div><h3>What keeps it down</h3><ul id="whyDown" class="why-list"></ul></div>
+        </div>
+      </div>
+      <p class="under"><span>Under the hood</span> Ridge regression for days, logistic regression for lateness.</p>
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      <span>Linear regression</span><span>Ridge &amp; Lasso</span><span>Logistic regression</span><span>Decision tree</span><span>Random forest</span><span>XGBoost</span><span>Naive Bayes</span><span>K-Means</span><span>PCA</span><span>KNN</span><span>Collaborative filtering</span><span>Thompson sampling</span><span>Neural network</span>
+      <span>Linear regression</span><span>Ridge &amp; Lasso</span><span>Logistic regression</span><span>Decision tree</span><span>Random forest</span><span>XGBoost</span><span>Naive Bayes</span><span>K-Means</span><span>PCA</span><span>KNN</span><span>Collaborative filtering</span><span>Thompson sampling</span><span>Neural network</span>
+    </div>
+  </div>
+
+  <!-- ===================== REVIEWS ===================== -->
+  <section class="block" id="reviews" aria-labelledby="h-reviews">
+    <div class="block-head">
+      <h2 id="h-reviews">Read a review the way a support team would</h2>
+      <p>Paste what a customer wrote. The model scores it from unhappy to delighted and shows which words moved the score.</p>
+    </div>
+    <div class="two">
+      <div class="panel pad">
+        <label class="field" for="reviewText">Customer review</label>
+        <textarea id="reviewText" rows="4" maxlength="600" placeholder="e.g. the product never arrived on time and the box was damaged"></textarea>
+        <div class="presets">
+          <button type="button" class="chip" data-review="great product, arrived before the deadline and works great">Happy</button>
+          <button type="button" class="chip" data-review="the product never arrived on time and the box was damaged">Unhappy</button>
+          <button type="button" class="chip" data-review="excellent quality but the seller ignored my messages">Mixed</button>
+        </div>
+        <button class="btn" type="button" id="btnReview">Score this review</button>
+        <p class="form-err" id="reviewErr" role="alert" hidden></p>
+      </div>
+      <div class="panel pad" aria-live="polite">
+        <div class="meter" id="sentMeter"><div class="meter-bar"><span class="meter-pin" id="sentPin"></span></div>
+          <div class="meter-ends"><span>Unhappy</span><span>Delighted</span></div></div>
+        <p class="big-line" id="sentVerdict">Score a review to see the verdict.</p>
+        <p class="muted" id="sentSub">&nbsp;</p>
+        <div class="words" id="sentWords"></div>
+        <p class="under"><span>Under the hood</span> TF-IDF features into a Naive Bayes classifier.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CUSTOMERS ===================== -->
+  <section class="block" id="customers" aria-labelledby="h-cust">
+    <div class="block-head">
+      <h2 id="h-cust">Look up a customer</h2>
+      <p>One lookup runs four models: which type of customer this is, how likely a first-time buyer is to order a second time, what coupon suits them, and what to show them next.</p>
+    </div>
+    <div class="two two-wide">
+      <div class="panel pad">
+        <form id="custForm" class="inline-form">
+          <label class="field grow">Customer id
+            <input id="custId" type="text" inputmode="text" placeholder="C00042" maxlength="8">
+          </label>
+          <button class="btn" type="submit">Look up</button>
+          <button class="btn ghost" type="button" id="btnRandom">Pick one for me</button>
+        </form>
+        <p class="form-err" id="custErr" role="alert" hidden></p>
+        <div id="custCard" class="cust" aria-live="polite">
+          <p class="muted">Ids run from C00000 to C14999.</p>
+        </div>
+      </div>
+      <div class="panel pad" aria-live="polite">
+        <h3 class="h3">Recommended next</h3>
+        <p class="muted" id="recStrategy">Look up a customer to see their picks.</p>
+        <div class="recs" id="recs"></div>
+        <h3 class="h3 mt">Find look-alikes of any product</h3>
+        <div class="inline-form">
+          <label class="field grow">Category<select id="simCat"></select></label>
+          <label class="field grow">Product<select id="simProd"></select></label>
+        </div>
+        <div class="recs" id="simList"></div>
+        <p class="under"><span>Under the hood</span> Gradient-boosted trees for repeat odds, K-Means for segments, KNN for look-alikes, a hybrid collaborative and content recommender.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== PRICING ===================== -->
+  <section class="block" id="pricing" aria-labelledby="h-price">
+    <div class="block-head">
+      <h2 id="h-price">Teach a coupon agent when discounts are worth it</h2>
+      <p>Four customer types react differently to a discount. The agent starts knowing nothing, tries coupons, and learns who needs one. It plays against simple rules on the same simulated customers.</p>
+    </div>
+    <div class="panel pad">
+      <div class="inline-form">
+        <label class="field grow">Customers served: <b id="roundsOut">20,000</b>
+          <input id="rounds" type="range" min="2000" max="30000" step="1000" value="20000">
+        </label>
+        <button class="btn" type="button" id="btnSim">Run a new simulation</button>
+      </div>
+      <p class="form-err" id="simErr" role="alert" hidden></p>
+      <div class="sim-grid">
+        <div>
+          <div class="legend" id="simLegend"></div>
+          <div class="chart" id="simChart" role="img" aria-label="Cumulative profit by strategy"></div>
+          <p class="chart-cap">Extra profit compared with giving no coupons, as customers arrive. Above zero beats doing nothing; below zero loses money.</p>
+        </div>
+        <div>
+          <div class="kpis" id="simKpis"></div>
+          <table class="table small" id="simLearned"></table>
+        </div>
+      </div>
+      <p class="note">The store is simulated: there is no real coupon data in an Olist-style dataset, so each segment's response to discounts is set by hand. What is real is the learning: the agent only sees who bought, never the hidden rules.</p>
+      <p class="under"><span>Under the hood</span> Thompson sampling (a multi-armed bandit), compared with epsilon-greedy and fixed discounts.</p>
+    </div>
+  </section>
+
+  <!-- ===================== DEMAND ===================== -->
+  <section class="block" id="demand" aria-labelledby="h-demand">
+    <div class="block-head">
+      <h2 id="h-demand">Forecast demand four weeks out</h2>
+      <p>Weekly units sold per category. The shaded stretch is data the models never saw during training; the forecast continues past the last known week.</p>
+    </div>
+    <div class="panel pad">
+      <div class="inline-form">
+        <label class="field grow">Category<select id="fcCat"></select></label>
+        <div class="fc-metrics" id="fcMetrics"></div>
+      </div>
+      <div class="legend" id="fcLegend"></div>
+      <div class="chart" id="fcChart" role="img" aria-label="Weekly demand history and forecast"></div>
+      <p class="under"><span>Under the hood</span> XGBoost and a small neural network on lagged sales and seasonality, against a "same as last week" baseline.</p>
+    </div>
+  </section>
+
+  <!-- ===================== MODEL LAB ===================== -->
+  <section class="block" id="lab" aria-labelledby="h-lab">
+    <div class="block-head">
+      <h2 id="h-lab">Model lab: every score, side by side</h2>
+      <p>Each task compares several algorithms on data they were not trained on. The best score in each column is marked.</p>
+    </div>
+    <div class="panel pad">
+      <div class="tabs" role="tablist" aria-label="Model comparisons" id="labTabs"></div>
+      <div id="labBody" role="tabpanel" tabindex="0"></div>
+    </div>
+  </section>
+
+  <!-- ===================== ABOUT ===================== -->
+  <section class="block" id="about" aria-labelledby="h-about">
+    <div class="block-head">
+      <h2 id="h-about">How it is built</h2>
+      <p>One fictional online store, one shared dataset, ten models that feed each other.</p>
+    </div>
+    <div class="panel pad">
+      <table class="table">
+        <thead><tr><th>Business question</th><th>Algorithms</th></tr></thead>
+        <tbody>
+          <tr><td>How many days will this order take?</td><td>Linear, Ridge and Lasso regression</td></tr>
+          <tr><td>Will it arrive late?</td><td>Logistic regression, compared with tree, forest and XGBoost</td></tr>
+          <tr><td>Which rules explain late orders?</td><td>Decision tree</td></tr>
+          <tr><td>Will this customer buy again?</td><td>Random forest and tuned XGBoost</td></tr>
+          <tr><td>Was the review happy or angry?</td><td>Naive Bayes on TF-IDF</td></tr>
+          <tr><td>What types of customer do we have?</td><td>K-Means on recency, frequency and spend, plus PCA</td></tr>
+          <tr><td>What looks like this product?</td><td>K-nearest neighbours</td></tr>
+          <tr><td>What should we show this customer?</td><td>Collaborative + content hybrid</td></tr>
+          <tr><td>Who deserves a coupon?</td><td>Thompson-sampling bandit</td></tr>
+          <tr><td>How much will we sell next week?</td><td>XGBoost versus a neural network</td></tr>
+        </tbody>
+      </table>
+      <p class="note">The data is simulated to look like the Olist Brazilian marketplace (orders, delivery dates, reviews, repeat purchases), with cause and effect built in, so the numbers here are not results from a real store. The README explains how to swap in the real Olist files.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span class="brand-sm">RetailBrain</span>
+  <span id="footStats">A portfolio project in applied machine learning.</span>
+</footer>
+
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
