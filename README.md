@@ -2,173 +2,147 @@
 
 **An online store that sees its own problems coming.**
 
-I wanted one machine learning project that showed I know *when* to reach for which algorithm, not ten unrelated notebooks. So I invented a small online store, gave it the usual headaches (late parcels, angry reviews, customers who never come back, coupons handed out blindly), and built the models a data team would build to deal with them. Then I put them behind a website you can actually click around in.
+RetailBrain is an end-to-end machine learning project built around a fictional online store. It combines ten models that predict delivery times, late orders, review sentiment, repeat buyers, customer types, product recommendations, coupon decisions and weekly demand, and serves them through a Flask website with light and dark themes.
 
-|  Light | Dark |
+**Live demo:** _add your link here after deploying_
+
+---
+
+## 1. The problem
+
+Every online store runs into the same issues:
+
+- Parcels arrive later than promised, and customers get annoyed.
+- Customers write reviews, but nobody has time to read thousands of them.
+- Most first-time buyers never come back, and it is unclear who is worth contacting.
+- All customers are treated alike, even though they behave very differently.
+- Coupons are handed out blindly, which burns margin on people who would have bought anyway.
+- Stock is ordered by guesswork instead of a forecast.
+
+RetailBrain tackles each of these with a model that is trained on data and tested on data it has never seen.
+
+## 2. What the project does
+
+The project simulates a store with about 18,800 orders, 15,000 customers and 600 products. Ten models work on that shared data. Some feed into others, so it behaves like one system rather than ten separate experiments.
+
+### Delivery
+1. **Delivery time estimate.** Predicts how many days an order will take from distance, weight, value, shipping cost and month. Linear regression, Ridge and Lasso are compared.
+2. **Late delivery risk.** Gives the probability that an order arrives after the promised date. Logistic regression is compared with a decision tree, random forest and XGBoost.
+3. **Rules behind late orders.** A shallow decision tree turns the data into plain rules, for example "ordered in December, tight promise, long distance means over half are late".
+
+### Customers
+4. **Repeat buyer prediction.** Estimates which first-time customers will order again. Logistic regression, random forest, XGBoost and a tuned XGBoost are compared, using lift and recall because only a small share of customers return.
+5. **Review sentiment.** Scores written reviews from unhappy to happy using TF-IDF features and Naive Bayes, and shows which words drove the score.
+6. **Customer segments.** K-Means on recency, frequency and spend groups customers into Loyal Repeaters, Big Spenders, New & Fresh and Dormant Savers. PCA is used to visualise them.
+
+### Recommendations and decisions
+7. **Similar products.** K-nearest neighbours finds look-alike products by price, weight, rating and category.
+8. **Recommendation engine.** A hybrid of collaborative filtering and popularity suggests what to show each customer, and handles new customers with little history.
+9. **Coupon agent.** A Thompson-sampling bandit (a reinforcement learning idea) learns which discount suits each customer type by trying options and keeping what works, and is compared with fixed discount rules.
+10. **Demand forecasting.** XGBoost and a neural network forecast weekly sales per category, compared with a simple "same as last week" baseline.
+
+### How the models connect
+- The sentiment model scores each customer's first review, and that score is an input to the repeat-buyer model.
+- Late deliveries and review scores both help predict who comes back.
+- The customer segments from K-Means are the groups the coupon agent learns about.
+- The customer lookup page combines segment, repeat odds, coupon advice and recommendations.
+
+## 3. Results
+
+All scores are measured on held-out data.
+
+| Task | Result |
 |---|---|
-| ![Light theme](docs/screenshot-light.png) | ![Dark theme](docs/screenshot-dark.png) |
+| Delivery time | Off by 1.85 days on average (guessing the average gives 4.01), R² 0.75 |
+| Late delivery | ROC-AUC 0.73; flagging the riskiest 10% of orders catches 35% of late ones |
+| Repeat buyers | ROC-AUC 0.69; 1.96 times better than random at picking returners |
+| Sentiment | 92% accuracy |
+| Recommender | Hit rate of 31.6% in the top 10, versus 23.3% for "most popular" |
+| Coupon agent | +15% profit versus no coupons, +8% versus 10% off for everyone |
+| Forecast | XGBoost off by 19%, neural network 23%, "same as last week" 27% |
 
-Everything runs on a plain Flask server. No JavaScript framework, no chart library, no database. It deploys as a single small web service.
+## 4. Toolkit
 
----
+| Area | Tools |
+|---|---|
+| Language | Python 3.12 |
+| Modelling | scikit-learn (regression, trees, forests, Naive Bayes, K-Means, KNN, PCA, MLP), XGBoost |
+| Data | pandas, NumPy, SciPy |
+| Backend | Flask, Gunicorn, a JSON API |
+| Frontend | HTML, CSS, JavaScript with no framework, hand-drawn SVG charts, light and dark themes |
+| Deployment | Docker, Render configuration, Procfile |
+| Testing | pytest |
+| Version control | Git and GitHub |
 
-## What's inside
+## 5. Advantages
 
-Ten modules share one dataset and feed each other. Scores are on held-out data the models never saw.
+- **End to end.** It covers data generation, training, evaluation, an API, a website, tests and deployment files, not just a notebook.
+- **Many algorithms, each with a reason.** Every algorithm has a job and is compared against alternatives, so the choices are explained rather than assumed.
+- **Honest evaluation.** Scores use held-out data, imbalance-aware metrics (ROC-AUC, PR-AUC, lift) and baselines, instead of accuracy alone.
+- **Explainable.** The site shows why an order is risky, which words drove a review score, and what drives repeat purchases.
+- **Models work together.** Outputs of one model feed another, like a real data product.
+- **Fast and light.** Predictions return instantly, and the app runs on a small free server.
+- **Easy to reproduce.** One command retrains everything in about 30 seconds, and the tests check that every model beats its baseline.
+- **Polished interface.** Light and dark themes, mobile-friendly layout, no external chart library.
 
-| # | Question | Algorithms | Result |
-|---|---|---|---|
-| 1 | How many days will this order take? | Linear, Ridge, Lasso | Off by **1.85 days** on average (always guessing the mean: 4.01). R² 0.75 |
-| 2 | Will it arrive late? | Logistic regression, compared with tree, random forest, XGBoost | ROC-AUC **0.73**. Flag the riskiest 10% of orders and you catch 35% of late ones (the base rate is 9%) |
-| 3 | Which rules explain late orders? | Decision tree (depth 4) | Plain-English rules, e.g. *ordered in December, tight promised window, over 230 km: 53% late* |
-| 4 | Will a first-time buyer come back? | Logistic, random forest, XGBoost, **tuned XGBoost** | ROC-AUC **0.69**. Contact the top 20% and you reach 39% of returners (1.96x better than random) |
-| 5 | Is a review happy or angry? | Naive Bayes on TF-IDF (vs logistic) | **92%** accuracy |
-| 6 | What kinds of customers do we have? | K-Means on recency, frequency, spend, plus PCA | 4 segments: Loyal Repeaters, Big Spenders, New & Fresh, Dormant Savers |
-| 7 | What looks like this product? | K-nearest neighbours | 5 look-alikes, same category 99.9% of the time |
-| 8 | What should we show this customer? | Collaborative filtering + popularity hybrid | Hit rate @10 of **31.6%** vs 23.3% for "most popular" and 1.3% random |
-| 9 | Who deserves a coupon? | Thompson-sampling bandit | **+15%** profit vs no coupons, **+8%** vs 10% off for everyone, within ~2% of an agent with perfect knowledge |
-| 10 | How much will we sell next week? | XGBoost vs a neural network (MLP) | XGBoost off by **19%**, the MLP by 23%, "same as last week" by 27% |
+## 6. Disadvantages and limitations
 
-### How the modules talk to each other
+- **The data is simulated.** It is generated to look like the Olist Brazilian marketplace, with cause and effect built in. The scores are a test of the methods, not findings about a real store.
+- **Review text is templated.** The 92% sentiment accuracy is easier than real reviews, which have sarcasm, slang and mixed languages.
+- **The coupon agent uses a hand-built store.** There is no real coupon data, so customer responses to discounts are assumed. Only the learning process is real.
+- **Repeat-buyer scores are modest.** An ROC-AUC of 0.69 is useful for ranking but far from certain for any single customer.
+- **Content similarity added nothing to the recommender.** Tuning gave it zero weight, so the final blend is collaborative filtering plus popularity.
+- **The neural network struggles.** With limited data it loses to XGBoost on forecasting, so the four-week forecast on the site uses XGBoost.
+- **No live data pipeline.** There is no monitoring for data drift, no automatic retraining and no database.
+- **Small scale.** It is designed for a demo-sized dataset, not millions of orders.
 
-- The sentiment model (5) scores every customer's first review, and that score becomes an input to the repeat-buyer model (4).
-- Lateness (2) and review score both help predict who returns (4).
-- K-Means segments (6) are the "customer types" the coupon agent (9) learns about.
-- Segment and repeat odds show up together on the customer lookup, alongside recommendations from (7) and (8).
+## 7. Uses
 
-Open the **Model lab** section on the site to see every comparison table, the decision-tree rules, SHAP-style feature importances, and the PCA plot.
+**As a portfolio project**
+- Shows supervised, unsupervised and reinforcement-style learning in one system.
+- Demonstrates the full path from data to a deployed web application.
 
----
+**As a template for real retail work**
+- **Operations:** warn customers or switch carriers when an order is likely to be late.
+- **Customer care:** sort reviews by sentiment and find the words behind complaints.
+- **Marketing:** target the customers most likely to return and give coupons only where they pay off.
+- **Merchandising:** show recommendations for new and existing customers, and group similar products.
+- **Planning:** forecast demand by category to guide stock and staffing.
 
-## Run it on your machine
+**As a learning tool**
+- Compares algorithms on the same task, with tables and plots.
+- Shows how to deal with imbalanced data, tune a model and avoid misleading metrics.
 
-You need Python 3.12 (3.11 should work too, but 3.12 is what I tested).
+## 8. Run it locally
+
+You need Python 3.12.
 
 ```bash
-git clone <your-repo-url> retailbrain
-cd retailbrain
+git clone https://github.com/savniagrawal1701/RetailBrain-ML-project.git
+cd RetailBrain-ML-project
 python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
+venv\Scripts\activate          # Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
-
-python app.py                     # then open http://localhost:5000
+python app.py
 ```
 
-The trained models are already in `models/`. If you want to rebuild them (about 30 seconds):
+Open http://localhost:5000.
+
+To retrain the models (about 30 seconds):
 
 ```bash
 python train.py
 ```
 
-Run the tests:
+To run the tests:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest -q
 ```
 
----
+## 9. Deploy
 
-## Deploy it
+**Render:** push the repo to GitHub, choose *New → Blueprint* on Render, and select this repo. `render.yaml` handles the rest.
 
-Pick whichever you like. All of them train the models during the build so the saved files always match the installed library versions.
-
-**Render (easiest, free tier works)**
-1. Push this folder to a GitHub repo.
-2. On Render choose *New → Blueprint* and select the repo. `render.yaml` does the rest.
-3. First load after a quiet spell can take about 30 seconds on the free tier while it wakes up.
-
-**Docker (works anywhere: Fly.io, Railway, Google Cloud Run, a VPS)**
-```bash
-docker build -t retailbrain .
-docker run -p 8000:8000 retailbrain      # http://localhost:8000
-```
-The container listens on `$PORT` if the host sets one, otherwise 8000. Hugging Face Spaces (Docker) expects port 7860, so set `PORT=7860` there.
-
-**Heroku-style platforms**: the `Procfile` and `runtime.txt` are included.
-
-A health check lives at `/health`.
-
----
-
-## About the data (please read this part)
-
-**The data is simulated.** The real Olist Brazilian e-commerce dataset needs a Kaggle login to download, so `src/data_gen.py` generates 18,804 orders from 15,000 customers across 600 products, shaped like Olist: seller and buyer states, distances, delivery dates versus promised dates, review scores and text, repeat purchases.
-
-Cause and effect are written into the generator (distance and December slow deliveries, late parcels get bad reviews, happy first-time buyers return more often), then the models have to rediscover those patterns from noisy examples. That makes this a fair test of the *methods*, but the numbers above are **not findings about a real store**. A few things to know:
-
-- The coupon agent's customers are a hand-built simulation (each segment gets its own price sensitivity). What's real is the learning: the agent only sees who bought.
-- Review text is built from phrase templates with noise added (including reviews where the words and the stars disagree), so 92% is easier than real life.
-- In the recommender, the tuning step found that item-similarity content features added nothing on top of collaborative filtering plus popularity, so the final blend weights content at zero. I left that in rather than hide it.
-- The 4-week neural-network forecast wobbles because it extrapolates poorly on this little data. The chart shows only its held-out weeks, and XGBoost carries the forecast.
-
-### Swapping in the real Olist data
-
-The training script only needs four tables from `generate()`: `orders`, `customers`, `products`, `interactions`. To use real Olist data:
-
-1. Download the dataset from Kaggle and put the CSVs in `data/raw/`.
-2. Write a small loader that returns the same columns (the first lines of `generate()` and `_build_orders()` list them): merge orders, items, customers, sellers, products and reviews; compute `distance_km` from the geolocation table with the haversine formula already in `data_gen.py`; set `is_late` and `delivery_days` from the timestamps.
-3. Olist has no browse events, so build `interactions` from `order_items`. Only about 3% of real customers buy twice, so expect the repeat-buyer scores to drop and the recommender to lean on popularity.
-4. Reviews are in Portuguese. Naive Bayes will still work, since it learns whatever words it is given.
-5. Run `python train.py` and everything else (API, website, tests) follows.
-
-If you do this, update the "simulated" notes on the About section and in this README. It is a strong upgrade for the project.
-
----
-
-## Project layout
-
-```
-retailbrain/
-├── app.py                 Flask app: pages + JSON API
-├── train.py               trains all 10 modules, writes models/ and artifacts.json
-├── src/
-│   ├── data_gen.py        simulated Olist-style data
-│   ├── bandit.py          coupon-agent simulator (Thompson, epsilon-greedy, baselines)
-│   ├── reco.py            hybrid recommender scoring
-│   ├── config.py          feature lists shared by training and serving
-│   └── utils.py           readable feature names
-├── templates/index.html   the page
-├── static/css, static/js  styling (light + dark) and front-end logic, hand-drawn SVG charts
-├── models/                trained models + metrics (committed so the app starts instantly)
-├── data/processed/        generated orders table
-├── tests/test_api.py      endpoint + model sanity tests
-├── Dockerfile  Procfile  render.yaml  runtime.txt  requirements.txt
-└── docs/                  screenshots
-```
-
-### API at a glance
-
-| Endpoint | What it does |
-|---|---|
-| `POST /api/order` | delivery days, late probability, reasons |
-| `POST /api/review` | sentiment and the words that drove it |
-| `GET /api/customer/<id>` | segment, repeat odds, coupon advice, recommendations |
-| `GET /api/similar/<product_id>` | KNN look-alikes |
-| `POST /api/pricing` | runs a fresh coupon-agent simulation |
-| `GET /api/forecast/<category>` | weekly history, held-out predictions, 4-week forecast |
-| `GET /api/lab` | every comparison table |
-
----
-
-## Talking points for interviews
-
-- **Why logistic regression for late orders when XGBoost is "better"?** Here it wasn't: logistic won (AUC 0.73 vs 0.70) because the signal is mostly additive, and it explains itself.
-- **Why not accuracy?** Only 9% of orders are late, so "never late" scores 91% and is useless. I used ROC-AUC, PR-AUC and "how many late orders do you catch if you flag the top 10%".
-- **Why a random split for delivery models?** A time split would leave the Nov/Dec peak out of the test window.
-- **Why Thompson sampling over A/B testing?** It shifts traffic towards winners while it learns, instead of wasting half the customers on the loser.
-- **What would break in production?** Late-delivery features like the promised window are known at checkout, but a real system also needs drift monitoring and a data pipeline.
-
-## Resume lines you can adapt
-
-Use the numbers from your own run, and say the data is simulated (or swap in real Olist data first).
-
-- Built **RetailBrain**, an end-to-end ML platform on 18,800 simulated e-commerce orders combining linear/Ridge/Lasso regression, logistic regression, decision trees, random forest, XGBoost, Naive Bayes, K-Means, KNN, a hybrid recommender, a Thompson-sampling bandit and an MLP; deployed as a Flask web app with a light/dark UI.
-- Reduced delivery-time error from 4.0 to 1.85 days (R² 0.75) and flagged late orders with ROC-AUC 0.73, catching 35% of late parcels by reviewing only the riskiest 10% of orders.
-- Tuned XGBoost with randomized search (3-fold CV) to reach 1.96x lift over random for repeat-buyer targeting; explained predictions with SHAP values.
-- Designed a coupon bandit that lifted simulated profit 8% over a flat 10% discount and 15% over no coupons.
-- Wrote an API test suite and a Docker/Render deployment; trained models rebuild automatically at build time.
-
----
-
-Built as a portfolio project. MIT licensed: change the name in `LICENSE` to yours.
+**Docker:**
